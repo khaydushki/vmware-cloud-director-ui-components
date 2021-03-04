@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- The ability to group providers in sections in quick search.
+- The ability to add filters to quick search.
+
 ## [2.0.0-dev.2]
 ### Fixes
 - Makes it so the page size warning is only displayed when all are not shown.

@@ -6,6 +6,8 @@
 import { NgModule } from '@angular/core';
 import { QuickSearchComponent } from '@vcd/ui-components';
 import { Documentation } from '@vmw/ng-live-docs';
+import { QuickSearchFiltersExampleComponent } from './filters/quick-search-filters.example.component';
+import { QuickSearchFiltersExampleModule } from './filters/quick-search-filters.example.module';
 import { QuickSearchContentProjectionExampleComponent } from './quick-search-content-projection.example.component';
 import { QuickSearchContentProjectionExampleModule } from './quick-search-content-projection.example.module';
 import { QuickSearchHideEmptySectionExampleComponent } from './quick-search-hide-empty-section-example.component';
@@ -36,6 +38,12 @@ Documentation.registerDocumentationEntry({
             title: 'Hide empty section',
             urlSegment: 'hide-empty-section',
         },
+        {
+            component: QuickSearchFiltersExampleComponent,
+            forComponent: null,
+            title: 'Quick search filter',
+            urlSegment: 'filters',
+        },
     ],
 });
 
@@ -47,6 +55,7 @@ Documentation.registerDocumentationEntry({
         QuickSearchSyncAsyncExampleModule,
         QuickSearchHideEmptySectionExampleModule,
         QuickSearchContentProjectionExampleModule,
+        QuickSearchFiltersExampleModule,
     ],
 })
 export class QuickSearchExamplesModule {}

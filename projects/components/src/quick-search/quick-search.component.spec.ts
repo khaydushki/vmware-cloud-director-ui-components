@@ -11,7 +11,7 @@ import { ClarityModule } from '@clr/angular';
 import { MockTranslationService, TranslationService } from '@vcd/i18n';
 import { WidgetFinder, WidgetObject } from '../utils/test/widget-object';
 import { QuickSearchResultItem, QuickSearchResultsType } from './quick-search-result';
-import { QuickSearchComponent, ResultActivatedEvent } from './quick-search.component';
+import { QuickSearchComponent, QuickSearchFilter, ResultActivatedEvent } from './quick-search.component';
 import { QuickSearchModule } from './quick-search.module';
 import { QuickSearchProviderDefaults } from './quick-search.provider';
 import { QuickSearchService } from './quick-search.service';
@@ -44,6 +44,8 @@ abstract class TestProviderBase extends QuickSearchProviderDefaults {
 
 // Provider that returns an array
 class SimpleSearchProvider extends TestProviderBase {
+    id = 'simple';
+
     constructor(public shouldDebounceInput: boolean) {
         super(shouldDebounceInput);
     }
@@ -469,6 +471,62 @@ describe('QuickSearchComponent', () => {
             expect(this.quickSearch.searchResults.length).toBe(0);
             expect(this.quickSearch.sectionTitles.length).toEqual(0, 'There should be no sections finishing search');
         }));
+
+        it('displays nested providers title correctly with nested, filtered providers', function (this: Test): void {
+            // Open
+            this.quickSearchData.anotherSimpleProvider.hideWhenEmpty = true;
+            this.quickSearchData.anotherSimpleProvider.sectionName = 'another section';
+            this.quickSearchData.spotlightSearchService.registerNestedProvider({
+                sectionName: 'Some Nested Provider',
+                order: -1,
+                children: [this.quickSearchData.simpleProvider, this.quickSearchData.anotherSimpleProvider],
+            });
+            this.finder.hostComponent.spotlightOpen = true;
+            this.finder.detectChanges();
+            // Set search
+            this.quickSearch.searchInputValue = 'o';
+            //
+            expect(this.quickSearch.searchResults.length).toBe(4);
+            expect(this.quickSearch.sectionTitles).toEqual([
+                'section',
+                'Some Nested Provider',
+                'section',
+                'another section',
+            ]);
+
+            this.quickSearch.searchInputValue = 'copy';
+            this.finder.detectChanges();
+            expect(this.quickSearch.searchResults.length).toBe(2);
+            expect(this.quickSearch.sectionTitles).toEqual(['section', 'Some Nested Provider', 'section']);
+        });
+
+        it('orders nested providers by their given order', function (this: Test): void {
+            // Open
+            this.quickSearchData.spotlightSearchService.registerNestedProvider({
+                sectionName: 'Some Nested Provider',
+                order: 2,
+                children: [this.quickSearchData.simpleProvider],
+            });
+
+            this.quickSearchData.spotlightSearchService.registerNestedProvider({
+                sectionName: 'Another Nested Provider',
+                order: 1,
+                children: [this.quickSearchData.simpleProvider],
+            });
+
+            this.finder.hostComponent.spotlightOpen = true;
+            this.finder.detectChanges();
+            // Set search
+            this.quickSearch.searchInputValue = 'o';
+            //
+            expect(this.quickSearch.sectionTitles).toEqual([
+                'section',
+                'Another Nested Provider',
+                'section',
+                'Some Nested Provider',
+                'section',
+            ]);
+        });
     });
 
     describe('selection', () => {
@@ -750,6 +808,57 @@ describe('QuickSearchComponent', () => {
             expect(this.quickSearch.bottomOfResultsText).toEqual('Bottom of results');
         });
     });
+
+    describe('filters', () => {
+        beforeEach(function (this: Test): void {
+            this.finder.hostComponent.spotlightOpen = true;
+            this.finder.detectChanges();
+        });
+
+        it('allows the user to display filters', function (this: Test): void {
+            this.finder.hostComponent.filters = [
+                {
+                    id: 'type',
+                    options: [{ display: 'simple' }],
+                },
+            ];
+            this.quickSearchData.anotherSimpleProvider.sectionName = 'another section';
+            this.quickSearchData.spotlightSearchService.registerProvider(this.quickSearchData.anotherSimpleProvider);
+            this.quickSearch.searchInputValue = 'copy';
+            this.finder.detectChanges();
+            expect(this.quickSearch.sectionTitles.length).toEqual(2);
+
+            this.quickSearch.searchInputValue = 'copy type:simple';
+            this.finder.detectChanges();
+            expect(this.quickSearch.sectionTitles.length).toEqual(1);
+            expect(this.quickSearch.searchResults).toEqual(['copy']);
+        });
+
+        it('can navigate filters using arrow keys', fakeAsync(function (this: Test): void {
+            this.finder.hostComponent.filters = [
+                {
+                    id: 'stupid_filter',
+                    options: [{ display: 'bad_option' }],
+                },
+                {
+                    id: 'type',
+                    options: [{ display: 'simple' }, { display: 'another' }, { display: 'another2' }],
+                },
+            ];
+            this.finder.detectChanges();
+            this.quickSearch.openFiltersDropdown();
+            this.quickSearch.pressArrowDown();
+            this.quickSearch.pressEnter();
+            tick();
+            expect(this.quickSearch.searchInputValue.trim()).toEqual('type:');
+            this.quickSearch.searchInputValue = 'type:an';
+            this.finder.detectChanges();
+            this.quickSearch.pressArrowDown();
+            this.quickSearch.pressEnter();
+            tick();
+            expect(this.quickSearch.searchInputValue.trim()).toEqual('type:another2');
+        }));
+    });
 });
 
 @Component({
@@ -758,6 +867,7 @@ describe('QuickSearchComponent', () => {
             [(open)]="spotlightOpen"
             (resultActivated)="resultActivated($event)"
             [placeholder]="placeholder"
+            [filters]="filters"
         >
             <div class="top-of-results" *ngIf="isTopOfResultsShown">Top of results</div>
             <div class="bottom-of-results" *ngIf="isBottomOfResultsShown">Bottom of results</div>
@@ -769,6 +879,7 @@ export class HostSpotlightSearchComponent {
     public spotlightOpen = false;
     public isTopOfResultsShown = false;
     public isBottomOfResultsShown = false;
+    public filters: QuickSearchFilter[] = [];
     resultActivated(event: ResultActivatedEvent): void {}
 }
 
@@ -853,5 +964,9 @@ export class QuickSearchWidgetObject extends WidgetObject<QuickSearchComponent> 
 
     public get isLoading(): boolean {
         return !!this.findElement('.spinner');
+    }
+
+    public openFiltersDropdown(): void {
+        return this.click('.open-filter');
     }
 }

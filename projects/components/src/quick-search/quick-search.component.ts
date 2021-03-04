@@ -10,10 +10,54 @@ import { QuickSearchResultItem, QuickSearchResults, QuickSearchResultsType } fro
 import { QuickSearchProvider } from './quick-search.provider';
 import { QuickSearchService } from './quick-search.service';
 
+/**
+ * A group of search sections.
+ */
+interface GroupedSearchSections {
+    /**
+     * The i18n key for the header.
+     */
+    headerTitle: string;
+    /**
+     * All of the sections within this section.
+     */
+    subSections: SearchSection[];
+}
+
 interface SearchSection {
     provider: QuickSearchProvider;
     result: QuickSearchResults;
     isLoading: boolean;
+}
+
+/**
+ * A filter that can be applied to quick search to filter results.
+ */
+export interface QuickSearchFilter {
+    id: string;
+    options: QuickSearchFilterOption[];
+}
+
+/**
+ * Represents a possible selection option for a filter.
+ */
+export interface QuickSearchFilterOption {
+    /**
+     * The displayed title of this option.
+     */
+    display: string;
+    /**
+     * Any optional data that is associated with this option.
+     */
+    data?: any;
+}
+
+/**
+ * A filter that has a value typed in.
+ */
+export interface ActiveQuickSearchFilter extends QuickSearchFilter {
+    value: string;
+    data: any;
 }
 
 /**
@@ -105,6 +149,8 @@ export class QuickSearchComponent {
         return this._open;
     }
 
+    @Input() filters: QuickSearchFilter[] = [];
+
     /**
      * This method along with `open` property provide two-way binding [(open)] for controlling the visibility state
      * of the quick search component
@@ -131,22 +177,69 @@ export class QuickSearchComponent {
     set searchCriteria(value: string) {
         this._searchCriteria = value;
         this.doSearch();
+        this.filterBeingEdited = this.getLastFilter();
+        this.filterBeingEditedOptions = this.getFilterOptionsMatchSearch(this.filterBeingEdited?.options);
+        if (!this.filterBeingEdited) {
+            this.currentFilterOptionSelection = undefined;
+        } else {
+            this.currentFilterOptionSelection = this.filterBeingEditedOptions[0];
+            this.closeAllFilterDropdown();
+        }
+        setTimeout(() => {
+            if (this.filterOptionsDropdown) {
+                this.filterOptionsDropdown.nativeElement.style.left =
+                    String(this.measurementDiv.nativeElement.offsetWidth + 50) + 'px';
+            }
+        });
     }
+
+    /**
+     * If the dropdown that shows all possible filters is open.
+     */
+    allFiltersDropdownOpen = false;
+
+    /**
+     * Represents the current filter that the user is typing into.
+     */
+    filterBeingEdited: QuickSearchFilter;
+    /**
+     * The options for the current filter being edited
+     */
+    filterBeingEditedOptions: QuickSearchFilterOption[];
+
     private _searchCriteria: string;
 
     private _open = false;
 
     @ViewChild('searchInput', { static: false, read: ElementRef }) searchInput: ElementRef;
 
+    @ViewChild('filtersOptions', { static: false }) filterOptionsDropdown: ElementRef;
+
+    @ViewChild('measurementDiv', { static: false }) measurementDiv: ElementRef;
+
     private searchId = 0;
+
+    private currentActiveFilters: ActiveQuickSearchFilter[] = [];
 
     /**
      * The search sections are provided by the {@link QuickSearchService} upon opening the Quick Search.
      * This insures that new sections based on the current context of the application may appear.
      */
-    searchSections: SearchSection[] = [];
+    groupedSearchSections: GroupedSearchSections[] = [];
+    ungroupedSearchSections: SearchSection[] = [];
 
+    /**
+     * The selected result in the results section.
+     */
     selectedItem: QuickSearchResultItem;
+    /**
+     * The current selected dropdown in the filter options dropdown.
+     */
+    currentFilterOptionSelection: QuickSearchFilterOption;
+    /**
+     * The current selected filter in the all filters dropdown.
+     */
+    allFiltersCurrentSelection: QuickSearchFilter;
 
     itemClicked(item: QuickSearchResultItem): void {
         this.handleItem(item, true);
@@ -163,11 +256,72 @@ export class QuickSearchComponent {
     }
 
     onEnterKey(event): void {
-        event.preventDefault();
-        if (!this.selectedItem) {
+        if (this.allFiltersCurrentSelection) {
+            this.autoFillSelectedFilter(this.allFiltersCurrentSelection);
+            this.searchInput.nativeElement.focus();
+            return;
+        } else if (this.currentFilterOptionSelection) {
+            this.autofillSelectedFilterOption(this.currentFilterOptionSelection.display);
+            this.searchInput.nativeElement.focus();
+            return;
+        } else if (!this.selectedItem) {
             return;
         }
+        event.preventDefault();
         this.handleItem(this.selectedItem, false);
+    }
+
+    getFlattenedSearchSections(): SearchSection[] {
+        const allSections: SearchSection[] = [];
+        this.groupedSearchSections.forEach((section) => allSections.push(...section.subSections));
+        return [...this.ungroupedSearchSections, ...allSections];
+    }
+
+    private getLastFilter(): QuickSearchFilter {
+        if (!this.searchCriteria) {
+            return;
+        }
+        const parts = this.searchCriteria.split(' ');
+        const finalFilter = parts[parts.length - 1];
+        return this.filters.find((filter) => finalFilter.match(filter.id + ':'));
+    }
+
+    toggleAllFilterDropdown() {
+        if (this.allFiltersDropdownOpen) {
+            this.closeAllFilterDropdown();
+        } else {
+            this.openAllFilterDropdown();
+        }
+    }
+
+    private openAllFilterDropdown() {
+        this.allFiltersDropdownOpen = true;
+        this.allFiltersCurrentSelection = this.filters[0];
+    }
+
+    private closeAllFilterDropdown() {
+        this.allFiltersDropdownOpen = false;
+        this.allFiltersCurrentSelection = undefined;
+    }
+
+    getFilterOptionsMatchSearch(options: QuickSearchFilterOption[]): QuickSearchFilterOption[] {
+        if (!options) {
+            return [];
+        }
+        const parts = this.searchCriteria.split(':');
+        const searchTerm = parts[parts.length - 1];
+        return options.filter((option) => option.display.startsWith(searchTerm));
+    }
+
+    autofillSelectedFilterOption(option: string) {
+        const parts = this.searchCriteria.split(':');
+        parts.pop();
+        this.searchCriteria = parts.join(':') + ':' + option + ' ';
+    }
+
+    autoFillSelectedFilter(filter: QuickSearchFilter): void {
+        this.searchCriteria = (this.searchCriteria || '') + ' ' + filter.id + ':';
+        this.closeAllFilterDropdown();
     }
 
     private doSearch(): void {
@@ -176,16 +330,43 @@ export class QuickSearchComponent {
 
         this.selectedItem = null;
 
+        const activeFilters: ActiveQuickSearchFilter[] = [];
+        let removedFiltersSearch = this.searchCriteria;
+        if (removedFiltersSearch) {
+            for (const filter of this.filters) {
+                while (removedFiltersSearch.includes(filter.id + ':')) {
+                    const parts = removedFiltersSearch.split(filter.id + ':');
+                    const beginning = parts.shift();
+                    const end = parts.join(filter.id + ':');
+                    const parts2 = end.split(' ');
+                    const filterValue = parts2.shift();
+                    const rest = parts2.join(' ');
+                    activeFilters.push({
+                        id: filter.id,
+                        options: filter.options,
+                        value: filterValue,
+                        data: filter.options.find((option) => option.display === filterValue)?.data,
+                    });
+                    removedFiltersSearch = (beginning + rest).trim();
+                }
+            }
+        }
+
+        if (activeFilters !== this.currentActiveFilters) {
+            this.updateActiveSections(activeFilters);
+            this.currentActiveFilters = activeFilters;
+        }
+
         // Mark each sections in loading state. This flag is needed when trying to select the first item
         // while the search is still in progress
-        this.searchSections.forEach((searchSection) => (searchSection.isLoading = true));
+        this.getFlattenedSearchSections().forEach((searchSection) => (searchSection.isLoading = true));
 
         // Go through the available search sections, i.e. the registered search providers and request for results
-        this.searchSections.forEach(async (searchSection) => {
+        this.getFlattenedSearchSections().forEach(async (searchSection) => {
             let searchResult: QuickSearchResults;
             // Only request for data if the search is not empty
-            if (!!this.searchCriteria) {
-                const result = searchSection.provider.search(this.searchCriteria);
+            if (!!removedFiltersSearch) {
+                const result = searchSection.provider.search(removedFiltersSearch, activeFilters);
 
                 // Some of the results may be provided later, so mark the section as loading
                 if (result instanceof Promise) {
@@ -215,7 +396,7 @@ export class QuickSearchComponent {
      * @param ensureFirstSectionIsLoaded if true and if the topmost section is still loading then do not select an item
      */
     private selectFirst(ensureFirstSectionIsLoaded: boolean): void {
-        for (const section of this.searchSections) {
+        for (const section of this.getFlattenedSearchSections()) {
             // The section is still loading. If it was requested to ensure the loading has completed than abort
             // the attempt to select an item or just skip it and examine the next section.
             if (section.isLoading) {
@@ -234,19 +415,44 @@ export class QuickSearchComponent {
 
     private selectNext(down: boolean): void {
         // If there is no selection then just select the first available item
-        if (!this.selectedItem) {
-            this.selectFirst(false);
-            return;
+        if (this.currentFilterOptionSelection) {
+            this.currentFilterOptionSelection = this.genericSelectNext(
+                down,
+                this.currentFilterOptionSelection,
+                this.filterBeingEditedOptions
+            );
+        } else if (this.allFiltersCurrentSelection) {
+            this.allFiltersCurrentSelection = this.genericSelectNext(
+                down,
+                this.allFiltersCurrentSelection,
+                this.filters
+            );
+        } else {
+            if (!this.selectedItem) {
+                this.selectFirst(false);
+                return;
+            }
+            this.selectedItem = this.genericSelectNext(
+                down,
+                this.selectedItem,
+                this.getFlattenedSearchSections().reduce((acc, v) => [...acc, ...(v.result?.items || [])], [])
+            );
+
+            if (this.selectedItem === null) {
+                this.selectFirst(false);
+            }
         }
+        // Call the change detector otherwise the selection on the screen may not refreshed quickly enough if the
+        // user just presses and holds down the arrow key
+        this.changeDetectorRef.detectChanges();
+    }
 
-        // Get all the items form all the sections in a single flat array
-        const allResults = this.searchSections.reduce((acc, v) => [...acc, ...(v.result?.items || [])], []);
-
-        let selectedItemIndex = allResults.indexOf(this.selectedItem);
+    private genericSelectNext<T, R>(down: boolean, selected: T, allResults: T[]) {
+        let selectedItemIndex = allResults.indexOf(selected);
 
         // There is a selected item but it is not one of the available ones, so just select the first from the list
         if (selectedItemIndex < 0) {
-            this.selectedItem = null;
+            selected = null;
             this.selectFirst(false);
             return;
         }
@@ -266,17 +472,15 @@ export class QuickSearchComponent {
             }
         }
 
-        this.selectedItem = allResults[selectedItemIndex];
-
-        // Call the change detector otherwise the selection on the screen may not refreshed quickly enough if the
-        // user just presses and holds down the arrow key
-        this.changeDetectorRef.detectChanges();
+        selected = allResults[selectedItemIndex];
 
         // Ensure the selected element is visible
         DomUtil.scrollToElement(this.el, '.selected');
         if (selectedItemIndex === 0) {
-            DomUtil.scrollToElement(this.el, '.section-index-0 .search-result-section-title');
+            DomUtil.scrollToElement(this.el, '.section-index-0-0 .search-result-section-title');
         }
+
+        return selected;
     }
 
     /**
@@ -291,15 +495,12 @@ export class QuickSearchComponent {
         }
 
         if (open) {
-            this.searchSections = this.searchService
-                .getRegisteredProviders()
-                .map((provider) => ({ provider, result: null, isLoading: true }));
-            this.doSearch();
-
+            this.updateActiveSections([]);
             setTimeout(() => {
                 this.searchInput.nativeElement.focus();
                 this.searchInput.nativeElement.select();
             }, 0);
+            this.doSearch();
         }
 
         this._open = open;
@@ -307,8 +508,26 @@ export class QuickSearchComponent {
         this.changeDetectorRef.detectChanges();
     }
 
+    private updateActiveSections(activeFilters: ActiveQuickSearchFilter[]) {
+        this.ungroupedSearchSections = this.searchService.getRegisteredProviders(activeFilters).map((provider) => ({
+            provider,
+            result: null,
+            isLoading: true,
+        }));
+        this.groupedSearchSections = this.searchService.getRegisteredNestedProviders(activeFilters).map((section) => {
+            return {
+                headerTitle: section.sectionName,
+                subSections: section.children.map((provider) => ({
+                    provider,
+                    result: null,
+                    isLoading: true,
+                })),
+            };
+        });
+    }
+
     private handleItem(item: QuickSearchResultItem, clicked: boolean): void {
-        const searchSection: SearchSection = this.searchSections.find(
+        const searchSection: SearchSection = this.getFlattenedSearchSections().find(
             (section) =>
                 !section.isLoading &&
                 section.result?.items.some((resultItem) => resultItem.displayText === item.displayText)
@@ -345,6 +564,10 @@ export class QuickSearchComponent {
         }
 
         return true;
+    }
+
+    showParentSectionTitle(parentSection: GroupedSearchSections): boolean {
+        return parentSection.subSections.some((section) => this.showSectionTitle(section));
     }
 
     showNoResults(searchSection: SearchSection): boolean {
