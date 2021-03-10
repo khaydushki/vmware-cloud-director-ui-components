@@ -137,6 +137,9 @@ export class QuickSearchComponent {
      */
     @Input() public placeholder: string;
 
+    /**
+     * A helper text that will be placed below the search input.
+     */
     @Input() public helper: string;
 
     /**
@@ -151,10 +154,22 @@ export class QuickSearchComponent {
         return this._open;
     }
 
+    /**
+     * A list of filters that can be used to filter the list of providers and/or the results from a given provider.
+     *
+     * All filters have some ID that is displayed and a list of options for their value. These options can also have associated data.
+     * A provider then must know a) if it can respond to a given filter and b) how to filter the search results given the filter.
+     * This means that if Filter A is present, and Provider 1 cannot respond to it, Provider 1 will not be displayed. Provider 2 must
+     * then filter it's results based on the filter.
+     *
+     * If two filters of different IDs are used in the search, the filters should act like and's. If two filters of the same ID
+     * are present in the search, the filter should act like an or.
+     */
     @Input() filters: QuickSearchFilter[] = [];
 
-    isPinned = false;
-
+    /**
+     * Outputs an event when the user changes the pinning status of this component.
+     */
     @Output() isPinnedChange = new EventEmitter<boolean>();
 
     /**
@@ -168,6 +183,8 @@ export class QuickSearchComponent {
      * This happens when item is clicked or 'Enter' is pressed when there is a selection.
      */
     @Output() resultActivated: EventEmitter<ResultActivatedEvent> = new EventEmitter<ResultActivatedEvent>();
+
+    isPinned = false;
 
     constructor(
         private searchService: QuickSearchService,
@@ -186,15 +203,18 @@ export class QuickSearchComponent {
         this.filterBeingEdited = this.getLastFilter();
         this.filterBeingEditedOptions = this.getFilterOptionsMatchSearch(this.filterBeingEdited?.options);
         if (!this.filterBeingEdited) {
-            this.currentFilterOptionSelection = undefined;
+            this.currentFilterOptionSelection = null;
         } else {
             this.currentFilterOptionSelection = this.filterBeingEditedOptions[0];
             this.closeAllFilterDropdown();
         }
+
+        // The filterOptionsDropdown is not rendered immediately after the search criteria is set. It takes a moment
+        // for this change to propagate through Angular. As such, we need to setTimeout to be able to shift the element.
         setTimeout(() => {
             if (this.filterOptionsDropdown) {
                 this.filterOptionsDropdown.nativeElement.style.left =
-                    String(this.measurementDiv.nativeElement.offsetWidth + 50) + 'px';
+                    this.measurementDiv.nativeElement.offsetWidth + 50 + 'px';
             }
         });
     }
@@ -207,7 +227,7 @@ export class QuickSearchComponent {
     /**
      * Represents the current filter that the user is typing into.
      */
-    filterBeingEdited: QuickSearchFilter;
+    filterBeingEdited: QuickSearchFilter = null;
     /**
      * The options for the current filter being edited
      */
@@ -230,6 +250,11 @@ export class QuickSearchComponent {
     /**
      * The search sections are provided by the {@link QuickSearchService} upon opening the Quick Search.
      * This insures that new sections based on the current context of the application may appear.
+     *
+     * The groupedSearchSections are sections that come from Nested providers and are a double deep list of results with
+     * a parent section name, and sub section names.
+     *
+     * The ungroupedSearchSections are sections that come from Search providers and are a single list of results with a section name.
      */
     groupedSearchSections: GroupedSearchSections[] = [];
     ungroupedSearchSections: SearchSection[] = [];
@@ -241,11 +266,11 @@ export class QuickSearchComponent {
     /**
      * The current selected dropdown in the filter options dropdown.
      */
-    currentFilterOptionSelection: QuickSearchFilterOption;
+    currentFilterOptionSelection: QuickSearchFilterOption = null;
     /**
      * The current selected filter in the all filters dropdown.
      */
-    allFiltersCurrentSelection: QuickSearchFilter;
+    allFiltersCurrentSelection: QuickSearchFilter = null;
 
     itemClicked(item: QuickSearchResultItem): void {
         this.handleItem(item, true);
@@ -266,11 +291,13 @@ export class QuickSearchComponent {
             this.autoFillSelectedFilter(this.allFiltersCurrentSelection);
             this.searchInput.nativeElement.focus();
             return;
-        } else if (this.currentFilterOptionSelection) {
+        }
+        if (this.currentFilterOptionSelection) {
             this.autofillSelectedFilterOption(this.currentFilterOptionSelection.display);
             this.searchInput.nativeElement.focus();
             return;
-        } else if (!this.selectedItem) {
+        }
+        if (!this.selectedItem) {
             return;
         }
         event.preventDefault();
@@ -279,13 +306,14 @@ export class QuickSearchComponent {
 
     getFlattenedSearchSections(): SearchSection[] {
         const allSections: SearchSection[] = [];
+        // Takes the nested providers, and turns them to a single deep list of sections.
         this.groupedSearchSections.forEach((section) => allSections.push(...section.subSections));
         return [...this.ungroupedSearchSections, ...allSections];
     }
 
     private getLastFilter(): QuickSearchFilter {
         if (!this.searchCriteria) {
-            return;
+            return null;
         }
         const parts = this.searchCriteria.split(' ');
         const finalFilter = parts[parts.length - 1];
@@ -307,10 +335,10 @@ export class QuickSearchComponent {
 
     private closeAllFilterDropdown() {
         this.allFiltersDropdownOpen = false;
-        this.allFiltersCurrentSelection = undefined;
+        this.allFiltersCurrentSelection = null;
     }
 
-    getFilterOptionsMatchSearch(options: QuickSearchFilterOption[]): QuickSearchFilterOption[] {
+    private getFilterOptionsMatchSearch(options: QuickSearchFilterOption[]): QuickSearchFilterOption[] {
         if (!options) {
             return [];
         }
@@ -333,6 +361,8 @@ export class QuickSearchComponent {
     togglePinned(): void {
         this.isPinned = !this.isPinned;
         this.isPinnedChange.emit(this.isPinned);
+        // When the pinning of the component changes, the searchInput is re-rendered. Because of this, we need to wait for
+        // Angular to re-render the searchInput before focusing it.
         setTimeout(() => {
             this.searchInput.nativeElement.focus();
         });
@@ -344,35 +374,11 @@ export class QuickSearchComponent {
 
         this.selectedItem = null;
 
-        const activeFilters: ActiveQuickSearchFilter[] = [];
-        let removedFiltersSearch = this.searchCriteria;
-        if (removedFiltersSearch) {
-            for (const filter of this.filters) {
-                while (removedFiltersSearch.includes(filter.id + ':')) {
-                    const parts = removedFiltersSearch.split(filter.id + ':');
-                    const beginning = parts.shift();
-                    const end = parts.join(filter.id + ':');
-                    const parts2 = end.split(' ');
-                    const filterValue = parts2.shift();
-                    const rest = parts2.join(' ');
-                    activeFilters.push({
-                        id: filter.id,
-                        options: filter.options,
-                        value: filterValue,
-                        data: filter.options.find((option) => option.display === filterValue)?.data,
-                    });
-                    removedFiltersSearch = (beginning + rest).trim();
-                }
-            }
-        }
+        const { searchTerm, filters } = this.parseSearchCriteria(this.searchCriteria);
 
-        if (removedFiltersSearch) {
-            removedFiltersSearch = removedFiltersSearch.trim();
-        }
-
-        if (activeFilters !== this.currentActiveFilters) {
-            this.updateActiveSections(activeFilters);
-            this.currentActiveFilters = activeFilters;
+        if (filters !== this.currentActiveFilters) {
+            this.updateActiveSections(filters);
+            this.currentActiveFilters = filters;
         }
 
         // Mark each sections in loading state. This flag is needed when trying to select the first item
@@ -383,8 +389,8 @@ export class QuickSearchComponent {
         this.getFlattenedSearchSections().forEach(async (searchSection) => {
             let searchResult: QuickSearchResults;
             // Only request for data if the search is not empty
-            if ((removedFiltersSearch && removedFiltersSearch.length > 0) || activeFilters.length > 0) {
-                const result = searchSection.provider.search(removedFiltersSearch, activeFilters);
+            if ((searchTerm && searchTerm.length > 0) || filters.length > 0) {
+                const result = searchSection.provider.search(searchTerm, filters);
 
                 // Some of the results may be provided later, so mark the section as loading
                 if (result instanceof Promise) {
@@ -617,5 +623,52 @@ export class QuickSearchComponent {
             };
         }
         return null;
+    }
+
+    /**
+     * Parses the given search criteria to remove all filters and separate them.
+     *
+     * @example this.parseSearchCriteria('searchTerm filter:value other:value') =>
+     * {
+     *    searchTerm: 'searchTerm',
+     *    filters: [{ id: 'filter', value: 'value', ...}, { id: 'other', value: 'value'}]
+     * }
+     */
+    private parseSearchCriteria(
+        searchCriteria: string
+    ): {
+        searchTerm: string;
+        filters: ActiveQuickSearchFilter[];
+    } {
+        const activeFilters: ActiveQuickSearchFilter[] = [];
+        let removedFiltersSearch = searchCriteria;
+        if (removedFiltersSearch) {
+            for (const filter of this.filters) {
+                while (removedFiltersSearch.includes(filter.id + ':')) {
+                    const parts = removedFiltersSearch.split(filter.id + ':');
+                    const beginning = parts.shift();
+                    const end = parts.join(filter.id + ':');
+                    const parts2 = end.split(' ');
+                    const filterValue = parts2.shift();
+                    const rest = parts2.join(' ');
+                    activeFilters.push({
+                        id: filter.id,
+                        options: filter.options,
+                        value: filterValue,
+                        data: filter.options.find((option) => option.display === filterValue)?.data,
+                    });
+                    removedFiltersSearch = (beginning + rest).trim();
+                }
+            }
+        }
+
+        if (removedFiltersSearch) {
+            removedFiltersSearch = removedFiltersSearch.trim();
+        }
+
+        return {
+            filters: activeFilters,
+            searchTerm: removedFiltersSearch,
+        };
     }
 }

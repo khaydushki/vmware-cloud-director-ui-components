@@ -8,12 +8,15 @@ import { NgModule } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { ClarityModule } from '@clr/angular';
 import { QuickSearchModule, VcdFormModule } from '@vcd/ui-components';
-import { ActionsSearchProvider, QuickSearchFiltersExampleComponent } from './quick-search-filters.example.component';
+import {
+    ActionsSearchProvider,
+    QuickSearchNestedProvidersExampleComponent,
+} from './quick-search-nested-providers.example.component';
 
 @NgModule({
     imports: [CommonModule, ClarityModule, QuickSearchModule, VcdFormModule, ReactiveFormsModule],
-    declarations: [QuickSearchFiltersExampleComponent],
-    exports: [QuickSearchFiltersExampleComponent],
-    entryComponents: [QuickSearchFiltersExampleComponent],
+    declarations: [QuickSearchNestedProvidersExampleComponent],
+    exports: [QuickSearchNestedProvidersExampleComponent],
+    entryComponents: [QuickSearchNestedProvidersExampleComponent],
 })
-export class QuickSearchFiltersExampleModule {}
+export class QuickSearchNestedProvidersExampleModule {}

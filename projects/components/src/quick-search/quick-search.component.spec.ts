@@ -815,7 +815,7 @@ describe('QuickSearchComponent', () => {
             this.finder.detectChanges();
         });
 
-        it('allows the user to display filters', function (this: Test): void {
+        it('adds a filter icon that shows providers only of that type', function (this: Test): void {
             this.finder.hostComponent.filters = [
                 {
                     id: 'type',
@@ -828,6 +828,8 @@ describe('QuickSearchComponent', () => {
             this.finder.detectChanges();
             expect(this.quickSearch.sectionTitles.length).toEqual(2);
 
+            // When the type filter is present,, the list of providers is filtered based on it.
+            // In this case, the type:simple filter is set and anotherSimpleProvider is removed.
             this.quickSearch.searchInputValue = 'copy type:simple';
             this.finder.detectChanges();
             expect(this.quickSearch.sectionTitles.length).toEqual(1);

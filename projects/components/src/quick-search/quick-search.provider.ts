@@ -101,7 +101,7 @@ export abstract class QuickSearchProviderDefaults implements QuickSearchProvider
     data: unknown;
     parentSectionName?: string;
 
-    abstract search(criteria: string): QuickSearchResultsType;
+    abstract search(criteria: string, activeFilters?: ActiveQuickSearchFilter[]): QuickSearchResultsType;
 
     canHandleFilter(filter: ActiveQuickSearchFilter): boolean {
         return filter.id === 'type' && (this as any).id && (this as any).id.includes(filter.value);

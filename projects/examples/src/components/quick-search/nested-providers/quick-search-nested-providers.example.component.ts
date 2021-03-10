@@ -3,10 +3,8 @@
  * SPDX-License-Identifier: BSD-2-Clause
  */
 
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import {
-    ActiveQuickSearchFilter,
-    QuickSearchFilter,
     QuickSearchProviderDefaults,
     QuickSearchRegistrarService,
     QuickSearchResultItem,
@@ -15,28 +13,12 @@ import {
 
 @Component({
     selector: 'vcd-quick-search-sync-async-example',
-    styleUrls: ['./quick-search-filters.example.component.scss'],
-    templateUrl: './quick-search-filters.example.component.html',
+    styleUrls: ['./quick-search-nested-providers.example.component.scss'],
+    templateUrl: './quick-search-nested-providers.example.component.html',
     providers: [QuickSearchRegistrarService],
 })
-export class QuickSearchFiltersExampleComponent implements OnInit {
+export class QuickSearchNestedProvidersExampleComponent implements OnInit {
     spotlightOpen: boolean;
-
-    filters: QuickSearchFilter[] = [
-        {
-            id: 'type',
-            options: [
-                { display: 'actions1' },
-                { display: 'actions2' },
-                { display: 'actions3' },
-                { display: 'actions4' },
-            ],
-        },
-        {
-            id: 'is',
-            options: [{ display: 'real' }, { display: 'fake' }],
-        },
-    ];
 
     private actionsSearchProvider = new ActionsSearchProvider('actions1');
     private actionsSearchProvider2 = new ActionsSearchProvider('actions2');
@@ -46,22 +28,25 @@ export class QuickSearchFiltersExampleComponent implements OnInit {
     constructor(private searchRegistrar: QuickSearchRegistrarService) {}
 
     ngOnInit(): void {
-        this.searchRegistrar.register(this.actionsSearchProvider);
-        this.searchRegistrar.register(this.actionsSearchProvider2);
-        this.searchRegistrar.register(this.actionsSearchProvider3);
+        this.searchRegistrar.register({
+            children: [this.actionsSearchProvider, this.actionsSearchProvider2],
+            sectionName: 'Section 2',
+            order: 2,
+        });
+        this.searchRegistrar.register({
+            children: [this.actionsSearchProvider3],
+            sectionName: 'Section 1',
+            order: 1,
+        });
         this.searchRegistrar.register(this.actionsSearchProvider4);
     }
 }
 
-const actions: string[] = ['copy', 'paste', 'move', 'dummy', 'other-dummy'];
+const actions: string[] = ['copy', 'paste', 'move', 'dummy'];
 
-function buildFilter(criteria: string, filters: ActiveQuickSearchFilter[]): (item: QuickSearchResultItem) => boolean {
+function buildFilter(criteria: string): (item: QuickSearchResultItem) => boolean {
     criteria = criteria ? criteria.toLowerCase() : '';
-    const isFilter = filters.find((filter) => filter.id === 'is');
-    return (item: QuickSearchResultItem) =>
-        item.displayText.toLowerCase().includes(criteria) &&
-        (!isFilter ||
-            (isFilter.value === 'fake' ? item.displayText.includes('dummy') : !item.displayText.includes('dummy')));
+    return (item: QuickSearchResultItem) => criteria && item.displayText.toLowerCase().includes(criteria);
 }
 
 export class ActionsSearchProvider extends QuickSearchProviderDefaults {
@@ -92,14 +77,10 @@ export class ActionsSearchProvider extends QuickSearchProviderDefaults {
         });
     }
 
-    search(criteria: string, filters: ActiveQuickSearchFilter[]): QuickSearchResultsType {
-        const items = this.actions.filter(buildFilter(criteria, filters));
+    search(criteria: string): QuickSearchResultsType {
+        const items = this.actions.filter(buildFilter(criteria));
         return {
             items,
         };
-    }
-
-    canHandleFilter(filter: ActiveQuickSearchFilter): boolean {
-        return super.canHandleFilter(filter) || filter.id === 'is';
     }
 }

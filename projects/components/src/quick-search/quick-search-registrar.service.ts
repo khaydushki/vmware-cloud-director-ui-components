@@ -39,6 +39,6 @@ export class QuickSearchRegistrarService implements OnDestroy {
     }
 
     private isNestedProvider(a: QuickSearchProvider | QuickSearchNestedProvider): a is QuickSearchNestedProvider {
-        return (a as any).children;
+        return (a as QuickSearchNestedProvider).children !== undefined;
     }
 }
