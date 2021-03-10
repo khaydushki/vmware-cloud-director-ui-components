@@ -137,6 +137,8 @@ export class QuickSearchComponent {
      */
     @Input() public placeholder: string;
 
+    @Input() public helper: string;
+
     /**
      * This property alongside with `openChange` provide two-way binding [(open)] for controlling the visibility state
      * of the quick search component
@@ -150,6 +152,10 @@ export class QuickSearchComponent {
     }
 
     @Input() filters: QuickSearchFilter[] = [];
+
+    isPinned = false;
+
+    @Output() isPinnedChange = new EventEmitter<boolean>();
 
     /**
      * This method along with `open` property provide two-way binding [(open)] for controlling the visibility state
@@ -324,6 +330,14 @@ export class QuickSearchComponent {
         this.closeAllFilterDropdown();
     }
 
+    togglePinned(): void {
+        this.isPinned = !this.isPinned;
+        this.isPinnedChange.emit(this.isPinned);
+        setTimeout(() => {
+            this.searchInput.nativeElement.focus();
+        });
+    }
+
     private doSearch(): void {
         // Remember which is the current search. This will help us not to show results from an old search
         const searchId = ++this.searchId;
@@ -352,6 +366,10 @@ export class QuickSearchComponent {
             }
         }
 
+        if (removedFiltersSearch) {
+            removedFiltersSearch = removedFiltersSearch.trim();
+        }
+
         if (activeFilters !== this.currentActiveFilters) {
             this.updateActiveSections(activeFilters);
             this.currentActiveFilters = activeFilters;
@@ -365,7 +383,7 @@ export class QuickSearchComponent {
         this.getFlattenedSearchSections().forEach(async (searchSection) => {
             let searchResult: QuickSearchResults;
             // Only request for data if the search is not empty
-            if (!!removedFiltersSearch) {
+            if ((removedFiltersSearch && removedFiltersSearch.length > 0) || activeFilters.length > 0) {
                 const result = searchSection.provider.search(removedFiltersSearch, activeFilters);
 
                 // Some of the results may be provided later, so mark the section as loading
@@ -539,7 +557,9 @@ export class QuickSearchComponent {
         };
         item.handler();
         this.resultActivated.emit(resultActivatedEvent);
-        this.open = false;
+        if (!this.isPinned) {
+            this.open = false;
+        }
     }
 
     showSectionTitle(searchSection: SearchSection): boolean {

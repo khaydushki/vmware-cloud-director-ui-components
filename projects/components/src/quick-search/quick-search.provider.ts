@@ -28,6 +28,12 @@ export interface QuickSearchNestedProvider {
      * The providers that should be displayed within this nested provider.
      */
     children: QuickSearchProvider[];
+
+    /**
+     * A custom property available throughout all the providers. Not designed for any specific scenario.
+     * Use it according to the specific needs you may have.
+     */
+    data?: unknown;
 }
 
 /**
