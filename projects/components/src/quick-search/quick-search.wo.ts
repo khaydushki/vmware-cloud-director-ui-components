@@ -1,40 +1,41 @@
-/*
- * Copyright 2020 VMware, Inc. All rights reserved. VMware Confidential
+/*!
+ * Copyright 2021 VMware, Inc.
+ * SPDX-License-Identifier: BSD-2-Clause
  */
-
-// import { FormInputWidget } from '../../../../../../cypress/support/widgets/form-input.widget';
 
 import { BaseWidgetObject } from '../utils/test/widget-object/widget-object';
 import { QuickSearchDataUi } from './quick-search.dataui';
 
-export const QUICK_SEARCH_INPUT_CONTAINER = '.search-input-container';
-const QUICK_SEARCH_RESULT_CONTAINER = '.search-result-container';
-const QUICK_SEARCH_RESULT_SECTION = '.search-result-section';
-const QUICK_SEARCH_RESULT_SECTION_TITLE = '.search-result-section-title';
-const QUICK_SEARCH_RESULT_INDEX = '.section-index-';
-const QUICK_SEARCH_RESULT_ITEM = '.search-result-item';
 const QUICK_SEARCH_CURRENT_RESULT = '.selected';
 
-const QUICK_SEARCH_RESULT_NOT_FOUND = -1;
-
+/**
+ * Widget Object for Quick-Search
+ */
 export class QuickSearchWo<T> extends BaseWidgetObject<T> {
     static tagName = 'vcd-quick-search';
 
+    /**
+     * Returns quick-search modal body
+     */
     getModalBody = this.factory.dataUi(QuickSearchDataUi.quickSearchModal);
 
+    /**
+     * Returns user search input
+     */
     getInput = this.factory.dataUi(QuickSearchDataUi.searchInputContainer);
 
-    getSearchResultContainer = this.factory.dataUi(QuickSearchDataUi.searchResultContainer);
+    /**
+     * Returns the titles of all sections appearing in the search results
+     */
+    getSearchResultSectionTitles = this.factory.dataUi(QuickSearchDataUi.searchResultSectionTitles);
 
-    getSearchResultSection = this.factory.dataUi(QuickSearchDataUi.searchResultSection);
+    /**
+     * Returns each search result item in each section
+     */
+    getSearchResultItems = this.factory.dataUi(QuickSearchDataUi.searchResultItems);
 
-    getSearchResultSectionTitle = this.factory.dataUi(QuickSearchDataUi.searchResultSectionTitle);
-
-    getSearchResultIndex = this.factory.dataUi(QuickSearchDataUi.searchResultSectionIndex);
-
-    getSearchResultItem = this.factory.dataUi(QuickSearchDataUi.searchResultItem);
-
-    getSelectSearchResultItem = this.factory.dataUi(QuickSearchDataUi.selectCurrentResult);
-
-    getResultNotFound = this.factory.dataUi(QuickSearchDataUi.searchResultNotFound);
+    /**
+     * Returns the currently selected search result item
+     */
+    getSelectedSearchResultItem = this.factory.css(QUICK_SEARCH_CURRENT_RESULT);
 }

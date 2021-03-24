@@ -11,16 +11,11 @@
             *ngFor="let item of searchSection.result?.items"
             (click)="itemClicked(item)"
             [ngClass]="item == selectedItem && !this.currentFilterOptionSelection ? 'selected' : ''"
-            [attr.data-ui]="DataUi.searchResultItem"
+            [attr.data-ui]="DataUi.searchResultItems"
         >
             {{ item.displayText }}
         </li>
-        <li
-            class="no-results"
-            data-ui="no-results"
-            *ngIf="showNoResults(searchSection)"
-            [attr.data-ui]="DataUi.searchResultNotFound"
-        >
+        <li class="no-results" data-ui="no-results" *ngIf="showNoResults(searchSection)">
             {{ 'vcd.cc.quickSearch.noResults' | translate }}
         </li>
         <li>
@@ -55,8 +50,6 @@
                     [ngClass]="this.currentFilterOptionSelection.display === option.display ? 'selected' : ''"
                     *ngFor="let option of filterBeingEditedOptions; trackBy: filterOptionTrackBy"
                     (click)="autofillSelectedFilterOption(option.display)"
-                    [attr.data-ui]="DataUi.selectCurrentResult"
-                    [attr.data-ui]="DataUi.searchResultItem"
                 >
                     {{ option.display }}
                 </li>
@@ -68,19 +61,17 @@
     </div>
     <clr-control-helper class="input-helper">{{ helper }}</clr-control-helper>
     <ng-content select=".top-of-results"></ng-content>
-    <div class="search-result-container" [attr.data-ui]="DataUi.searchResultContainer">
+    <div class="search-result-container">
         <section
             *ngFor="let searchSection of ungroupedSearchSections; let i = index; trackBy: sectionTrackBy"
             class="search-result-section section-index-0-{{ i + 1 }}"
             data-ui="search-result-section"
-            [attr.data-ui]="DataUi.searchResultSection"
-            [attr.data-ui]="DataUi.searchResultSectionIndex"
         >
             <h5
                 *ngIf="searchSection.shouldShowText"
                 class="search-result-section-title"
                 data-ui="section-title"
-                [attr.data-ui]="DataUi.searchResultSectionTitle"
+                [attr.data-ui]="DataUi.searchResultSectionTitles"
             >
                 {{ searchSection.provider.sectionName }}
                 <span *ngIf="searchSection.hasPartialResult; let partial" class="partial-result">
@@ -106,7 +97,6 @@
                     *ngIf="searchSection.shouldShowText"
                     class="p2 search-result-section-title search-result-section section-index-{{ n }}-{{ i }}"
                     data-ui="section-title"
-                    [attr.data-ui]="DataUi.searchResultSectionIndex"
                 >
                     {{ searchSection.provider.sectionName }}
                     <span *ngIf="searchSection.hasPartialResult; let partial" class="partial-result">
